@@ -1,0 +1,1 @@
+add_library(Hello MODULE FunctionArgumentInstatiation.cpp)
