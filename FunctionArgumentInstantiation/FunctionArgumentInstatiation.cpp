@@ -16,6 +16,27 @@ struct FAI : public FunctionPass {
 
     virtual bool runOnFunction(Function &F) {
         bool modified = false;
+        int functionCallIndex = 1;
+        for(Function::iterator block = F.begin(); block != F.end(); block++) {
+            for(BasicBlock::iterator inst = block->begin(); inst != block->end(); inst++) {
+                if(isa<CallInst>(inst)) {
+                    errs() << "found call #" << functionCallIndex++ << '\n';
+                    CallInst* callInst = dyn_cast<CallInst>(inst);
+                    Function *callee = callInst->getCalledFunction();
+                    for(Function::arg_iterator arg = callee->arg_begin(); arg != callee->arg_end(); arg++) {
+                        errs() << "==> " << *arg << ' ';
+                    }
+                    errs() << '\n';
+
+                    // processing caller arguments
+                    for (unsigned int i = 0; i < inst->getNumOperands(); ++i) {
+                        if(isa<Constant>(inst->getOperand(i))) {
+                            errs() << "found a constant argument\n";
+                        } 
+                    }
+                }
+            }
+        }
         return modified;
     }
 };
