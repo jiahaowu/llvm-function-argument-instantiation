@@ -69,6 +69,7 @@ bool FAI::runOnFunction(Function &F) {
                     callee->getParent()->getFunctionList().push_back(duplicateFunction);
                     modified = true;
                 }
+
             }
         }
     }
