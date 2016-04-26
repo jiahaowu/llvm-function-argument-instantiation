@@ -55,8 +55,9 @@ bool FAI::runOnFunction(Function &F) {
                 std::set<Value *> constantArgs;
                 // processing caller arguments
                 for (unsigned int i = 0; i < inst->getNumOperands(); ++i) {
-                    if(isa<Constant>(inst->getOperand(i))) {
+                    if(isa<Constant>(inst->getOperand(i)) && !isa<Function>(inst->getOperand(i))) {
                         errs() << "found a constant argument\n";
+                        errs() << *(inst->getOperand(i)) << '\n';
                         constantArgs.insert(inst->getOperand(i));
                     }
                 }
