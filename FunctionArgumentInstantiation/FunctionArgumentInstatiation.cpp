@@ -48,6 +48,9 @@ bool FAI::runOnFunction(Function &F) {
                 errs() << "found call #" << functionCallIndex++ << '\n';
                 CallInst* callInst = dyn_cast<CallInst>(inst);
                 Function *callee = callInst->getCalledFunction();
+                if(callee->isDeclaration()) {
+                    continue;
+                }
 
                 std::set<int> constantArgs;
                 int counting = 0;
@@ -71,7 +74,9 @@ bool FAI::runOnFunction(Function &F) {
                     caller->setCalledFunction(duplicateFunction);
                     // step 6 Remove a formal argument from a cloned function, and add it as a local variable instead.
                     for(Function::arg_iterator arg = duplicateFunction->arg_begin(); arg != duplicateFunction->arg_end(); arg++) {
-                        //errs() << 
+                        errs() << arg->getName() << '\n';
+                        Argument *A = dyn_cast<Argument>(arg);
+                        errs() << A->getArgNo() << '\n';
                     }
                     modified = true;
                 }
