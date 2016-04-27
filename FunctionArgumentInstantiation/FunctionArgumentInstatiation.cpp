@@ -48,17 +48,16 @@ bool FAI::runOnFunction(Function &F) {
                 errs() << "found call #" << functionCallIndex++ << '\n';
                 CallInst* callInst = dyn_cast<CallInst>(inst);
                 Function *callee = callInst->getCalledFunction();
-                for(Function::arg_iterator arg = callee->arg_begin(); arg != callee->arg_end(); arg++) {
-                    errs() << "==> " << *arg << ' ';
-                }
-                errs() << '\n';
-                std::set<Value *> constantArgs;
+
+                std::set<int> constantArgs;
+                int counting = 0;
                 // processing caller arguments
                 for (unsigned int i = 0; i < inst->getNumOperands(); ++i) {
                     if(isa<Constant>(inst->getOperand(i)) && !isa<Function>(inst->getOperand(i))) {
                         errs() << "found a constant argument\n";
                         errs() << *(inst->getOperand(i)) << '\n';
-                        constantArgs.insert(inst->getOperand(i));
+                        //constantArgs.insert(inst->getOperand(i));
+                        constantArgs.insert(counting++);
                     }
                 }
 
@@ -68,6 +67,12 @@ bool FAI::runOnFunction(Function &F) {
                     Function* duplicateFunction = CloneFunction(callee, VMap, false);
                     duplicateFunction->setLinkage(GlobalValue::InternalLinkage);
                     callee->getParent()->getFunctionList().push_back(duplicateFunction);
+                    CallInst *caller = dyn_cast<CallInst>(inst);
+                    caller->setCalledFunction(duplicateFunction);
+                    // step 6 Remove a formal argument from a cloned function, and add it as a local variable instead.
+                    for(Function::arg_iterator arg = duplicateFunction->arg_begin(); arg != duplicateFunction->arg_end(); arg++) {
+                        //errs() << 
+                    }
                     modified = true;
                 }
 
