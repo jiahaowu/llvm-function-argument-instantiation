@@ -53,14 +53,14 @@ bool FAI::runOnFunction(Function &F) {
                 }
 
                 std::set<int> constantArgs;
-                int counting = 0;
                 // processing caller arguments
                 for (unsigned int i = 0; i < inst->getNumOperands(); ++i) {
                     if(isa<Constant>(inst->getOperand(i)) && !isa<Function>(inst->getOperand(i))) {
                         errs() << "found a constant argument\n";
-                        errs() << *(inst->getOperand(i)) << '\n';
+                        //errs() << *(inst->getOperand(i)) << '\n';
+                        errs() << "insert " << i << " into set\n";
                         //constantArgs.insert(inst->getOperand(i));
-                        constantArgs.insert(counting++);
+                        constantArgs.insert(i);
                     }
                 }
 
@@ -74,9 +74,17 @@ bool FAI::runOnFunction(Function &F) {
                     caller->setCalledFunction(duplicateFunction);
                     // step 6 Remove a formal argument from a cloned function, and add it as a local variable instead.
                     for(Function::arg_iterator arg = duplicateFunction->arg_begin(); arg != duplicateFunction->arg_end(); arg++) {
-                        errs() << arg->getName() << '\n';
-                        Argument *A = dyn_cast<Argument>(arg);
-                        errs() << A->getArgNo() << '\n';
+                        errs() << arg->getArgNo() << '\n';
+                        // if this argument is used as constant at callsite, do the following:
+                        if(constantArgs.find(arg->getArgNo()) != constantArgs.end()) {
+                            errs() << "processing " << arg->getName() << '\n';
+                            auto entry = duplicateFunction->begin()->begin();
+                            AllocaInst *alloc = new AllocaInst(arg->getType(), arg->getName(), entry);
+                            alloc->setAlignment(4);
+                            Value *value = inst->getOperand(arg->getArgNo());
+                            StoreInst *storeInst = new StoreInst(value, alloc, false, entry);
+                            //arg->replaceAllUsesWith(alloc);
+                        }
                     }
                     modified = true;
                 }
