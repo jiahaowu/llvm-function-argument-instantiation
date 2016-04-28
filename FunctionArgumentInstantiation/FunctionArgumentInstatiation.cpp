@@ -83,7 +83,10 @@ bool FAI::runOnFunction(Function &F) {
                             alloc->setAlignment(4);
                             Value *value = inst->getOperand(arg->getArgNo());
                             StoreInst *storeInst = new StoreInst(value, alloc, false, entry);
-                            //arg->replaceAllUsesWith(alloc);
+                            storeInst->setAlignment(4);
+                            LoadInst *load = new LoadInst(alloc, "", false, entry);
+                            load->setAlignment(4);
+                            arg->replaceAllUsesWith(load);
                         }
                     }
                     modified = true;
