@@ -53,18 +53,21 @@ bool FAI::runOnFunction(Function &F) {
                 }
 
                 std::set<int> constantArgs;
-                int counting = 0;
+		int counting = 0;
                 // processing caller arguments
                 for (unsigned int i = 0; i < inst->getNumOperands(); ++i) {
                     if(isa<Constant>(inst->getOperand(i)) && !isa<Function>(inst->getOperand(i))) {
                         errs() << "found a constant argument\n";
+			errs() << "statement is " << i + 1 << "\n";
                         errs() << *(inst->getOperand(i)) << '\n';
                         //constantArgs.insert(inst->getOperand(i));
-                        constantArgs.insert(counting++);
+			errs() << "argument is no." << counting << '\n';
+                        constantArgs.insert(counting);
                     }
+		    counting++;
                 }
 
-                if(!constantArgs.empty() && !callee->isDeclaration()) {
+                if(!constantArgs.empty()) {
                     // Clone function
                     ValueToValueMapTy VMap;
                     Function* duplicateFunction = CloneFunction(callee, VMap, false);
@@ -73,11 +76,18 @@ bool FAI::runOnFunction(Function &F) {
                     CallInst *caller = dyn_cast<CallInst>(inst);
                     caller->setCalledFunction(duplicateFunction);
                     // step 6 Remove a formal argument from a cloned function, and add it as a local variable instead.
+		    int count = 0;
                     for(Function::arg_iterator arg = duplicateFunction->arg_begin(); arg != duplicateFunction->arg_end(); arg++) {
-                        errs() << arg->getName() << '\n';
-                        Argument *A = dyn_cast<Argument>(arg);
-                        errs() << A->getArgNo() << '\n';
-                    }
+			if(constantArgs.find(count) != constantArgs.end()){
+				errs() <<"count is "<< count << '\n';
+                        	errs() <<"the argument name is " <<arg->getName() << '\n';
+                       	 	Argument *A = dyn_cast<Argument>(arg);
+                        	errs() <<"the argument number is "<< A->getArgNo() << '\n';
+				//found the argument that need to be replaced
+				//replace argument
+			}
+			count++;
+		    }
                     modified = true;
                 }
 
