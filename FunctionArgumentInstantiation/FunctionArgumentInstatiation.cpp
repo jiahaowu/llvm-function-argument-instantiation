@@ -8,7 +8,6 @@
 #include <llvm/IR/Instructions.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/SourceMgr.h>
-
 #include <stack>
 #include <set>
 
@@ -48,33 +47,64 @@ bool FAI::runOnFunction(Function &F) {
                 errs() << "found call #" << functionCallIndex++ << '\n';
                 CallInst* callInst = dyn_cast<CallInst>(inst);
                 Function *callee = callInst->getCalledFunction();
+                ValueToValueMapTy VMap;
                 if(callee->isDeclaration()) {
+		errs() << "end of call: " << functionCallIndex - 1 << "\n";
                     continue;
                 }
-
                 std::set<int> constantArgs;
                 // processing caller arguments
-                for (unsigned int i = 0; i < inst->getNumOperands(); ++i) {
-                    if(isa<Constant>(inst->getOperand(i)) && !isa<Function>(inst->getOperand(i))) {
-                        errs() << "found a constant argument\n";
+		Function::arg_iterator arg = callee->arg_begin();
+		std::vector<Value*> Args;
+                for (unsigned int i = 0; i < callInst->getNumArgOperands(); ++i) {
+                    if(isa<Constant>(callInst->getArgOperand(i)) && !isa<Function>(inst->getOperand(i))) {
+                        errs() << "I found a constant argument\n";
                         //errs() << *(inst->getOperand(i)) << '\n';
-                        errs() << "insert " << i << " into set\n";
+                        errs() << "constant argument index is: " << i << " into set\n";
                         //constantArgs.insert(inst->getOperand(i));
                         constantArgs.insert(i);
+			Constant *temp = cast<Constant>(callInst->getArgOperand(i));
+			VMap[arg] = temp;
                     }
+		    else{
+			errs() << "copy argument index: " << i << "\n";
+			Args.push_back(callInst->getArgOperand(i));
+			}
+		    arg++;
                 }
-
                 if(!constantArgs.empty() && !callee->isDeclaration()) {
                     // Clone function
-                    ValueToValueMapTy VMap;
                     Function* duplicateFunction = CloneFunction(callee, VMap, false);
-                    duplicateFunction->setLinkage(GlobalValue::InternalLinkage);
+                    //duplicateFunction->setLinkage(GlobalValue::InternalLinkage);
+		    duplicateFunction->setLinkage(callee->getLinkage());
+		    CallInst * New;
+/*
+		    if(InvokeInst * II = dyn_cast<InvokeInst>(callInst)){
+			New = InvokeInst::Create(duplicateFunction, II->getNormalDest(), II->getUnwindDest(),Args, "", callInst);
+			cast<InvokeInst>(New)->setCallingConv(callee->getCallingConv());
+			cast<InvokeInst>(New)->setAttributes(callee->getAttributes());
+		    }
+		    else{*/
+		    	New = CallInst::Create(duplicateFunction, Args, "");
+			//cast<CallInst>(New)->setCallingConv(callee->getCallingConv());
+			//cast<CallInst>(New)->setAttributes(callee->getAttributes());
+			if(callInst->isTailCall())New->setTailCall();
+		   // }
+		    New->setDebugLoc(callInst->getDebugLoc());	
+		    Args.clear();
+		    callInst->replaceAllUsesWith(New);
+		    New->takeName(callInst);
+		    errs() << "before " << callInst->getNumArgOperands() << "\n";
+	            callInst->eraseFromParent();
+		    CallInst * temp = dyn_cast<CallInst>(New);
+		    //callee = temp->getCalledFunction();
+	            errs() << "now" << temp->getNumArgOperands() <<"\n";
                     callee->getParent()->getFunctionList().push_back(duplicateFunction);
-                    CallInst *caller = dyn_cast<CallInst>(inst);
-                    caller->setCalledFunction(duplicateFunction);
                     // step 6 Remove a formal argument from a cloned function, and add it as a local variable instead.
-                    for(Function::arg_iterator arg = duplicateFunction->arg_begin(); arg != duplicateFunction->arg_end(); arg++) {
-                        errs() << arg->getArgNo() << '\n';
+                   
+		    
+		    /* for(Function::arg_iterator arg = callee->arg_begin(); arg != callee->arg_end(); arg++) {
+                        errs() <<"process argument No. " <<arg->getArgNo() << '\n';
                         // if this argument is used as constant at callsite, do the following:
                         if(constantArgs.find(arg->getArgNo()) != constantArgs.end()) {
                             errs() << "processing " << arg->getName() << '\n';
@@ -88,10 +118,10 @@ bool FAI::runOnFunction(Function &F) {
                             load->setAlignment(4);
                             arg->replaceAllUsesWith(load);
                         }
-                    }
+                    }*/
                     modified = true;
                 }
-
+		errs() << "end of a call\n";
             }
         }
     }
