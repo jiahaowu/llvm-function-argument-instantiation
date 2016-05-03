@@ -14,13 +14,13 @@
 using namespace llvm;
 
 namespace {
-struct FAI : public ModulePass {
-    static char ID;
-    FAI() : ModulePass(ID) {}
+    struct FAI : public ModulePass {
+        static char ID;
+        FAI() : ModulePass(ID) {}
 
-    virtual bool runOnModule(Module &M) override;
-    virtual bool runOnFunction(Function &F);
-};
+        virtual bool runOnModule(Module &M) override;
+        virtual bool runOnFunction(Function &F);
+    };
 }
 
 char FAI::ID = 0;
@@ -49,80 +49,70 @@ bool FAI::runOnFunction(Function &F) {
                 Function *callee = callInst->getCalledFunction();
                 ValueToValueMapTy VMap;
                 if(callee->isDeclaration()) {
-		errs() << "end of call: " << functionCallIndex - 1 << "\n";
                     continue;
                 }
                 std::set<int> constantArgs;
                 // processing caller arguments
-		Function::arg_iterator arg = callee->arg_begin();
-		std::vector<Value*> Args;
+                Function::arg_iterator arg = callee->arg_begin();
+                std::vector<Value*> Args;
                 for (unsigned int i = 0; i < callInst->getNumArgOperands(); ++i) {
                     if(isa<Constant>(callInst->getArgOperand(i)) && !isa<Function>(inst->getOperand(i))) {
-                        errs() << "I found a constant argument\n";
                         //errs() << *(inst->getOperand(i)) << '\n';
-                        errs() << "constant argument index is: " << i << " into set\n";
+                        //errs() << "I found a constant argument index is: " << i << "\n";
                         //constantArgs.insert(inst->getOperand(i));
                         constantArgs.insert(i);
-			Constant *temp = cast<Constant>(callInst->getArgOperand(i));
-			VMap[arg] = temp;
+                        Constant *temp = cast<Constant>(callInst->getArgOperand(i));
+                        VMap[arg] = temp;
                     }
-		    else{
-			errs() << "copy argument index: " << i << "\n";
-			Args.push_back(callInst->getArgOperand(i));
-			}
-		    arg++;
+                    else{
+                        //errs() << "copy argument index: " << i << "\n";
+                        Args.push_back(callInst->getArgOperand(i));
+                    }
+                    arg++;
                 }
                 if(!constantArgs.empty() && !callee->isDeclaration()) {
                     // Clone function
                     Function* duplicateFunction = CloneFunction(callee, VMap, false);
                     //duplicateFunction->setLinkage(GlobalValue::InternalLinkage);
-		    duplicateFunction->setLinkage(callee->getLinkage());
-		    CallInst * New;
-/*
-		    if(InvokeInst * II = dyn_cast<InvokeInst>(callInst)){
-			New = InvokeInst::Create(duplicateFunction, II->getNormalDest(), II->getUnwindDest(),Args, "", callInst);
-			cast<InvokeInst>(New)->setCallingConv(callee->getCallingConv());
-			cast<InvokeInst>(New)->setAttributes(callee->getAttributes());
-		    }
-		    else{*/
-		    	New = CallInst::Create(duplicateFunction, Args, "");
-			//cast<CallInst>(New)->setCallingConv(callee->getCallingConv());
-			//cast<CallInst>(New)->setAttributes(callee->getAttributes());
-			if(callInst->isTailCall())New->setTailCall();
-		   // }
-		    New->setDebugLoc(callInst->getDebugLoc());	
-		    Args.clear();
-		    callInst->replaceAllUsesWith(New);
-		    New->takeName(callInst);
-		    errs() << "before " << callInst->getNumArgOperands() << "\n";
-	            callInst->eraseFromParent();
-		    CallInst * temp = dyn_cast<CallInst>(New);
-		    //callee = temp->getCalledFunction();
-	            errs() << "now" << temp->getNumArgOperands() <<"\n";
+                    duplicateFunction->setLinkage(callee->getLinkage());
+                    Instruction * New;
+                    New = CallInst::Create(duplicateFunction, Args, "");
+                    cast<CallInst>(New)->setCallingConv(callee->getCallingConv());
+                    cast<CallInst>(New)->setAttributes(callee->getAttributes());
+                    if(callInst->isTailCall())cast<CallInst>(New)->setTailCall();
+                    New->setDebugLoc(callInst->getDebugLoc());	
+                    Args.clear();
+                    //callInst->replaceAllUsesWith(New);
+                    //New->takeName(callInst);
+                    callInst->getParent()->getInstList().insert(inst,New);
+                    errs() << "before: " << callInst->getNumArgOperands() << "\n";
+                    //callInst->eraseFromParent();
+                    CallInst * temp = dyn_cast<CallInst>(New);
+                    //callee = temp->getCalledFunction();
+                    errs() << "now: " << temp->getNumArgOperands() <<"\n";
                     callee->getParent()->getFunctionList().push_back(duplicateFunction);
                     // step 6 Remove a formal argument from a cloned function, and add it as a local variable instead.
-                   
-		    
-		    /* for(Function::arg_iterator arg = callee->arg_begin(); arg != callee->arg_end(); arg++) {
-                        errs() <<"process argument No. " <<arg->getArgNo() << '\n';
-                        // if this argument is used as constant at callsite, do the following:
-                        if(constantArgs.find(arg->getArgNo()) != constantArgs.end()) {
-                            errs() << "processing " << arg->getName() << '\n';
-                            auto entry = duplicateFunction->begin()->begin();
-                            AllocaInst *alloc = new AllocaInst(arg->getType(), arg->getName(), entry);
-                            alloc->setAlignment(4);
-                            Value *value = inst->getOperand(arg->getArgNo());
-                            StoreInst *storeInst = new StoreInst(value, alloc, false, entry);
-                            storeInst->setAlignment(4);
-                            LoadInst *load = new LoadInst(alloc, "", false, entry);
-                            load->setAlignment(4);
-                            arg->replaceAllUsesWith(load);
-                        }
+                    /* for(Function::arg_iterator arg = callee->arg_begin(); arg != callee->arg_end(); arg++) {
+                       errs() <<"process argument No. " <<arg->getArgNo() << '\n';
+                    // if this argument is used as constant at callsite, do the following:
+                    if(constantArgs.find(arg->getArgNo()) != constantArgs.end()) {
+                    errs() << "processing " << arg->getName() << '\n';
+                    auto entry = duplicateFunction->begin()->begin();
+                    AllocaInst *alloc = new AllocaInst(arg->getType(), arg->getName(), entry);
+                    alloc->setAlignment(4);
+                    Value *value = inst->getOperand(arg->getArgNo());
+                    StoreInst *storeInst = new StoreInst(value, alloc, false, entry);
+                    storeInst->setAlignment(4);
+                    LoadInst *load = new LoadInst(alloc, "", false, entry);
+                    load->setAlignment(4);
+                    arg->replaceAllUsesWith(load);
+                    }
                     }*/
                     modified = true;
                 }
-		errs() << "end of a call\n";
+                //errs() << "end of a call\n";
             }
+            //errs() << *inst << " next\n";
         }
     }
     return modified;
